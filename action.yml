@@ -1,0 +1,10 @@
+name: "Lite Jira Update Action"
+description: "A GitHub Action to post a comment to a Jira issue."
+author: "Ujjval Rajput"
+inputs: {}
+runs:
+  using: "node20"
+  main: "index.js"
+branding:
+  icon: "message-circle"
+  color: "blue"
