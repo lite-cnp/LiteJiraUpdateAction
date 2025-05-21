@@ -6,6 +6,10 @@ on:
   pull_request:
     types: [closed]  # Only trigger when a PR is closed (merged or not)
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   post-jira-comment:
     name: Post comment to Jira
