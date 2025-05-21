@@ -1,11 +1,16 @@
+# GitHub Action Metadata: Lite Jira Update Action
+# -----------------------------------------------
+# This file describes how the action is configured and run.
+# It allows this action to be used in a workflow via `uses: ./` or published to a registry.
+
 name: "Lite Jira Update Action"
-description: "A GitHub Action to post a comment to a Jira issue."
+description: "A GitHub Action to post a comment to a Jira issue when a pull request is merged."
 author: "Ujjval Rajput"
+
+# No custom inputs for now; all configuration is handled via environment variables and PR metadata.
 inputs: {}
+
+# Execution runtime: Node.js 20 using the compiled script at dist/index.js
 runs:
   using: "node20"
   main: "dist/index.js"
-
-branding:
-  icon: "message-circle"
-  color: "blue"
