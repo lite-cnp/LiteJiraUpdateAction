@@ -18,6 +18,7 @@
   "homepage": "https://github.com/liteUjjvalRajput/LiteJiraUpdateAction#readme",
   "description": "",
   "dependencies": {
+    "@actions/core": "^1.11.1",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {

@@ -21,5 +21,4 @@ jobs:
       - name: Run Lite Jira Update Action
         uses: ./
         env:
-          JIRA_USER: ${{ secrets.JIRA_USER }}
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
