@@ -27,3 +27,4 @@ jobs:
         uses: ./  # Run the local custom action defined in action.yml
         env:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}  # Inject Jira token securely from GitHub Secrets
+          JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}  # Inject Jira domain the same way
