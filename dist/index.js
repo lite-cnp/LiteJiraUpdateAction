@@ -35822,11 +35822,12 @@ var __webpack_exports__ = {};
  * - Triggered via `on: pull_request: types: [closed]`.
  * - Checks if the PR was merged (not just closed).
  * - Extracts a Jira issue key from the PR title or branch name using regex (e.g. `DOSE-104`).
- * - Builds a comment using PR metadata (author, title, description).
+ * - Builds a comment using PR metadata (author, title, description, files changed).
  * - Sends the comment to the related Jira issue via REST API.
  * 
  * Requirements:
  * - JIRA_TOKEN must be set as a GitHub Action Secret.
+ * - JIRA_DOMAIN must be set as a GitHub Action Secret.
  * - The Jira instance must accept Bearer token authentication via Personal Access Tokens (PAT).
  * 
  * Security:
@@ -35840,9 +35841,7 @@ const fetch = __nccwpck_require__(6705);
 const https = __nccwpck_require__(5692);
 const github = __nccwpck_require__(3228);
 
-const JIRA_DOMAIN = "https://jira.lumentum.com";
-// const ISSUE_KEY = "DOSE-104";
-// const COMMENT = "Testing Jira comment posting from GitHub Actions.";
+const JIRA_DOMAIN = process.env.JIRA_DOMAIN;
 
 const JIRA_TOKEN = process.env.JIRA_TOKEN;
 
@@ -35876,19 +35875,31 @@ async function postComment(issueKey, commentText) {
   }
 }
 
-// postComment(ISSUE_KEY, COMMENT); // comment when using dynamic PR-based comment logic
-
-// Dynamic PR-based comment logic
-
 function extractIssueKey(text) {
   const match = text.match(/\b[A-Z]{2,10}-\d+\b/); // boundary, uppercase, 2-10 chars, hyphen, digits, boundary
   return match ? match[0] : null;
 }
 
-function buildComment(pr) {
+async function getModifiedFiles(prNumber) {
+  const octokit = github.getOctokit(JIRA_TOKEN);
+
+  const { data } = await octokit.rest.pulls.listFiles({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    pull_number: prNumber,
+  });
+
+  return data.map(file => file.filename);
+}
+
+function buildComment(pr, filesChanged = []) {
   const author = pr.user?.login || "unknown";
   const title = pr.title || "(no title)";
   const body = pr.body || "(no description)";
+  const fileList = filesChanged.length > 0
+    ? `\n\nFiles Changed:\n- ` + filesChanged.join("\n- ")
+    : "";
+
   return `
 Pull request merged by @${author}
 
@@ -35896,9 +35907,10 @@ PR Title:
 ${title}
 
 PR Description:
-${body}
+${body}${fileList}
 `.trim();
 }
+
 
 async function runWithPR() {
   if (!JIRA_TOKEN) {
@@ -35920,7 +35932,8 @@ async function runWithPR() {
     return;
   }
 
-  const commentText = buildComment(pr);
+  const filesChanged = await getModifiedFiles(pr.number);
+  const commentText = buildComment(pr, filesChanged);
   console.log(`Posting comment to issue ${issueKey}...`);
   await postComment(issueKey, commentText);
 }
