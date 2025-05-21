@@ -1,24 +1,29 @@
+# GitHub Actions Workflow: Trigger Jira Comment on PR Merge
+
+# This workflow triggers when a pull request is closed.
+# The script will only post to Jira if the PR was actually merged.
 on:
   pull_request:
-    types: [closed]
+    types: [closed]  # Only trigger when a PR is closed (merged or not)
 
 jobs:
   post-jira-comment:
-    runs-on: ubuntu-latest
+    name: Post comment to Jira
+    runs-on: ubuntu-latest  # Use GitHub's hosted Linux runner
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - name: Checkout repository code
+        uses: actions/checkout@v4  # Pulls in the repo code
 
-      - name: Set up Node.js
+      - name: Set up Node.js environment
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: 20  # Use Node.js 20 runtime
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci  # Clean install from package-lock.json
 
       - name: Run Lite Jira Update Action
-        uses: ./
+        uses: ./  # Run the local custom action defined in action.yml
         env:
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}  # Inject Jira token securely from GitHub Secrets
