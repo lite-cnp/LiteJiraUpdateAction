@@ -35828,6 +35828,7 @@ var __webpack_exports__ = {};
  * Requirements:
  * - JIRA_TOKEN must be set as a GitHub Action Secret.
  * - JIRA_DOMAIN must be set as a GitHub Action Secret.
+ * - The GitHub Action must have access to the `GITHUB_TOKEN` environment variable.
  * - The Jira instance must accept Bearer token authentication via Personal Access Tokens (PAT).
  * 
  * Security:
@@ -35881,7 +35882,11 @@ function extractIssueKey(text) {
 }
 
 async function getModifiedFiles(prNumber) {
-  const octokit = github.getOctokit(JIRA_TOKEN);
+  const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
+  if (!octokit) {
+    core.setFailed("GITHUB_TOKEN is not set.");
+    return [];
+  }
 
   const { data } = await octokit.rest.pulls.listFiles({
     owner: github.context.repo.owner,

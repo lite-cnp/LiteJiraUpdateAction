@@ -26,5 +26,6 @@ jobs:
       - name: Run Lite Jira Update Action
         uses: ./  # Run the local custom action defined in action.yml
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Inject GitHub token that GitHub Actions provides
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}  # Inject Jira token securely from GitHub Secrets
           JIRA_DOMAIN: ${{ secrets.JIRA_DOMAIN }}  # Inject Jira domain the same way
