@@ -41,7 +41,9 @@ async function postComment(issueKey, commentText) {
 
 // postComment(ISSUE_KEY, COMMENT); // comment when using dynamic PR-based comment logic
 
+// ------------------
 // Dynamic PR-based comment logic
+// ------------------
 
 function extractIssueKey(text) {
   const match = text.match(/\b[A-Z]{2,10}-\d+\b/);
