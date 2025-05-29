@@ -1,22 +1,28 @@
 {
-  "name": "litejiraupdateaction",
-  "version": "1.0.0",
+  "name": "lite-jira-update-action",
+  "version": "1.1.0",
+  "description": "GitHub Action to post comments to Jira issues when PRs are merged.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "ncc build index.js -o dist",
+    "test": "echo \"No tests defined yet\""
   },
+  "author": "Ujjval Rajput",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/liteUjjvalRajput/LiteJiraUpdateAction.git"
+    "url": "https://github.com/liteUjjvalRajput/LiteJiraUpdateAction.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/liteUjjvalRajput/LiteJiraUpdateAction/issues"
   },
   "homepage": "https://github.com/liteUjjvalRajput/LiteJiraUpdateAction#readme",
-  "description": "",
+  "keywords": [
+    "github-action",
+    "jira",
+    "pr-merge",
+    "automation"
+  ],
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.1",

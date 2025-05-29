@@ -35876,10 +35876,46 @@ async function postComment(issueKey, commentText) {
   }
 }
 
-function extractIssueKey(text) {
-  const match = text.match(/\b[A-Z]{2,10}-\d+\b/); // boundary, uppercase, 2-10 chars, hyphen, digits, boundary
-  return match ? match[0] : null;
+function extractIssueKeys(texts) {
+  let keys = new Set();
+  
+  for (const text of texts) {
+    if (!text) continue; // go to next iteration if text is empty
+
+    // Regex to match Jira issue keys like DOSE-104, JIRA-123, etc.
+    const regex = /\b[A-Z]{2,10}-\d+\b/g; 
+    const matches = text.toUpperCase().match(regex);
+    
+    if (matches) {
+      matches.forEach(key => keys.add(key));
+    }
+  }
+
+  return Array.from(keys); // Convert Set to Array
 }
+
+async function getCommits(prNumber) {
+  const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
+
+  if (!octokit) {
+    core.setFailed("GITHUB_TOKEN is not set.");
+    return [];
+  }
+
+  const { data } = await octokit.rest.pulls.listCommits({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    pull_number: prNumber,
+  });
+
+    return data.map(commit => {
+      const sha = commit.sha ? commit.sha.substring(0, 7) : "(no sha)";
+      const message = commit.commit && commit.commit.message
+      ? commit.commit.message.split("\n")[0]
+      : "(no message)";
+      return `- ${sha}: ${message}`;
+    });
+  }
 
 async function getModifiedFiles(prNumber) {
   const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
@@ -35897,13 +35933,16 @@ async function getModifiedFiles(prNumber) {
   return data.map(file => file.filename);
 }
 
-function buildComment(pr, filesChanged = []) {
+function buildComment(pr, filesChanged = [], commits = []) {
   const author = pr.user?.login || "unknown";
   const title = pr.title || "(no title)";
   const body = pr.body || "(no description)";
   const fileList = filesChanged.length > 0
     ? `\n\nFiles Changed:\n- ` + filesChanged.join("\n- ")
     : "";
+  const commitList = commits.length > 0
+  ? `\n\nCommits:\n` + commits.join("\n")
+  : "";
 
   return `
 Pull request merged by @${author}
@@ -35912,14 +35951,18 @@ PR Title:
 ${title}
 
 PR Description:
-${body}${fileList}
+${body}${fileList}${commitList}
 `.trim();
 }
-
 
 async function runWithPR() {
   if (!JIRA_TOKEN) {
     core.setFailed("Missing JIRA_TOKEN environment variable.");
+    return;
+  }
+
+  if (!JIRA_DOMAIN) {
+    core.setFailed("Missing JIRA_DOMAIN environment variable.");
     return;
   }
 
@@ -35931,16 +35974,20 @@ async function runWithPR() {
     return;
   }
 
-  const issueKey = extractIssueKey(pr.title || pr.head.ref); // Check both title and branch name
-  if (!issueKey) {
-    core.setFailed("No Jira issue key found in PR title or branch.");
+  const issueKeys = extractIssueKeys([pr.title, pr.head?.ref, pr.body]); // Check title, branch name, and body for issue key
+  if (issueKeys.length === 0) {
+    core.setFailed("No Jira issue keys found in PR title, branch name, or body.");
     return;
   }
 
   const filesChanged = await getModifiedFiles(pr.number);
-  const commentText = buildComment(pr, filesChanged);
-  console.log(`Posting comment to issue ${issueKey}...`);
-  await postComment(issueKey, commentText);
+  const commits = await getCommits(pr.number);
+  const commentText = buildComment(pr, filesChanged, commits);
+
+  for (const issueKey of issueKeys) {
+    console.log(`Posting comment to Jira issue ${issueKey}...`);
+    await postComment(issueKey, commentText);
+  }
 }
 
 runWithPR();
