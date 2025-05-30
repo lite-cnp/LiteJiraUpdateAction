@@ -2,29 +2,29 @@
  * Lite Jira Update Action
  * ------------------------
  * This GitHub Action automatically posts a comment to a Jira issue when a pull request (PR) is merged.
- * 
+ *
  * Use Cases:
  * - Notify Jira when a PR related to a ticket (e.g. DOSE-104) is successfully merged.
  * - Improve traceability between GitHub activity and Jira tickets.
  * - Streamline release workflows for engineering and QA teams.
- * 
+ *
  * Behavior:
  * - Triggered via `on: pull_request: types: [closed]`.
  * - Checks if the PR was merged (not just closed).
- * - Extracts a Jira issue key from the PR title or branch name using regex (e.g. `DOSE-104`).
- * - Builds a comment using PR metadata (author, title, description, files changed).
- * - Sends the comment to the related Jira issue via REST API.
- * 
+ * - Extracts a Jira issue keys from the PR title, branch name, and body.
+ * - Builds a comment using PR metadata (author, title, description, files changed, commits).
+ * - Posts the comment to the corresponding Jira issue(s) using the Jira REST API.
+ *
  * Requirements:
  * - JIRA_TOKEN must be set as a GitHub Action Secret.
  * - JIRA_DOMAIN must be set as a GitHub Action Secret.
  * - The GitHub Action must have access to the `GITHUB_TOKEN` environment variable.
  * - The Jira instance must accept Bearer token authentication via Personal Access Tokens (PAT).
- * 
+ *
  * Security:
  * - JIRA_TOKEN is never printed to logs.
  * - SSL cert validation is disabled via `rejectUnauthorized: false`, which is acceptable for internal enterprise Jira servers.
- * 
+ *
  * Author: Ujjval Rajput
  */
 const core = require("@actions/core");
@@ -46,21 +46,25 @@ async function postComment(issueKey, commentText) {
       method: "POST",
       agent,
       headers: {
-        "Authorization": `Bearer ${JIRA_TOKEN}`,
+        Authorization: `Bearer ${JIRA_TOKEN}`,
         "Content-Type": "application/json",
-        "Accept": "application/json",
+        Accept: "application/json",
       },
       body: JSON.stringify({ body: commentText }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      core.setFailed(`Failed to post Jira comment (${response.status}): ${errorText}`);
+      core.setFailed(
+        `Failed to post Jira comment (${response.status}): ${errorText}`
+      );
       return;
     }
 
     const data = await response.json();
-    console.log(`Successfully posted comment to ${issueKey}. Comment ID: ${data.id}`);
+    console.log(
+      `Successfully posted comment to ${issueKey}. Comment ID: ${data.id}`
+    );
   } catch (error) {
     core.setFailed(`Error posting to Jira: ${error.message}`);
   }
@@ -68,16 +72,16 @@ async function postComment(issueKey, commentText) {
 
 function extractIssueKeys(texts) {
   let keys = new Set();
-  
+
   for (const text of texts) {
     if (!text) continue; // go to next iteration if text is empty
 
     // Regex to match Jira issue keys like DOSE-104, JIRA-123, etc.
-    const regex = /\b[A-Z]{2,10}-\d+\b/g; 
+    const regex = /\b[A-Z]{2,10}-\d+\b/g;
     const matches = text.toUpperCase().match(regex);
-    
+
     if (matches) {
-      matches.forEach(key => keys.add(key));
+      matches.forEach((key) => keys.add(key));
     }
   }
 
@@ -98,14 +102,15 @@ async function getCommits(prNumber) {
     pull_number: prNumber,
   });
 
-    return data.map(commit => {
-      const sha = commit.sha ? commit.sha.substring(0, 7) : "(no sha)";
-      const message = commit.commit && commit.commit.message
-      ? commit.commit.message.split("\n")[0]
-      : "(no message)";
-      return `- ${sha}: ${message}`;
-    });
-  }
+  return data.map((commit) => {
+    const sha = commit.sha ? commit.sha.substring(0, 7) : "(no sha)";
+    const message =
+      commit.commit && commit.commit.message
+        ? commit.commit.message.split("\n")[0]
+        : "(no message)";
+    return `- ${sha}: ${message}`;
+  });
+}
 
 async function getModifiedFiles(prNumber) {
   const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
@@ -120,19 +125,19 @@ async function getModifiedFiles(prNumber) {
     pull_number: prNumber,
   });
 
-  return data.map(file => file.filename);
+  return data.map((file) => file.filename);
 }
 
 function buildComment(pr, filesChanged = [], commits = []) {
   const author = pr.user?.login || "unknown";
   const title = pr.title || "(no title)";
   const body = pr.body || "(no description)";
-  const fileList = filesChanged.length > 0
-    ? `\n\nFiles Changed:\n- ` + filesChanged.join("\n- ")
-    : "";
-  const commitList = commits.length > 0
-  ? `\n\nCommits:\n` + commits.join("\n")
-  : "";
+  const fileList =
+    filesChanged.length > 0
+      ? `\n\nFiles Changed:\n- ` + filesChanged.join("\n- ")
+      : "";
+  const commitList =
+    commits.length > 0 ? `\n\nCommits:\n` + commits.join("\n") : "";
 
   return `
 Pull request merged by @${author}
@@ -166,7 +171,9 @@ async function runWithPR() {
 
   const issueKeys = extractIssueKeys([pr.title, pr.head?.ref, pr.body]); // Check title, branch name, and body for issue key
   if (issueKeys.length === 0) {
-    core.setFailed("No Jira issue keys found in PR title, branch name, or body.");
+    core.setFailed(
+      "No Jira issue keys found in PR title, branch name, or body."
+    );
     return;
   }
 
