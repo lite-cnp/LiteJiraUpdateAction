@@ -1,29 +1,39 @@
 /**
  * Lite Jira Update Action
  * ------------------------
- * This GitHub Action automatically posts a comment to a Jira issue when a pull request (PR) is merged.
+ * This GitHub Action automatically posts a comment to one or more Jira issues when a pull request (PR) is merged.
  *
  * Use Cases:
- * - Notify Jira when a PR related to a ticket (e.g. DOSE-104) is successfully merged.
- * - Improve traceability between GitHub activity and Jira tickets.
- * - Streamline release workflows for engineering and QA teams.
+ * - Notify Jira when a PR related to one or more tickets (e.g. DOSE-104, QA-202) is successfully merged.
+ * - Improve traceability between GitHub activity and related Jira issues.
+ * - Automatically update all subtasks and linked issues to keep all stakeholders informed.
+ * - Streamline release workflows for engineering, QA, and product teams.
  *
  * Behavior:
  * - Triggered via `on: pull_request: types: [closed]`.
- * - Checks if the PR was merged (not just closed).
- * - Extracts a Jira issue keys from the PR title, branch name, and body.
- * - Builds a comment using PR metadata (author, title, description, files changed, commits).
- * - Posts the comment to the corresponding Jira issue(s) using the Jira REST API.
+ * - Validates that the PR was actually merged (not just closed).
+ * - Extracts Jira issue keys from the PR title, branch name, and description using regex (e.g. `ABC-123`).
+ * - For each issue key found:
+ *   - Retrieves related issues from Jira, including:
+ *     - Subtasks
+ *     - Inward and outward linked issues
+ *   - Deduplicates the full list of issue keys using a Set.
+ * - Builds a comment with:
+ *   - PR author
+ *   - PR title and description
+ *   - List of changed files
+ *   - Commit hashes and commit messages
+ * - Posts the same comment to all related issues via the Jira REST API.
  *
  * Requirements:
- * - JIRA_TOKEN must be set as a GitHub Action Secret.
- * - JIRA_DOMAIN must be set as a GitHub Action Secret.
- * - The GitHub Action must have access to the `GITHUB_TOKEN` environment variable.
- * - The Jira instance must accept Bearer token authentication via Personal Access Tokens (PAT).
+ * - `JIRA_TOKEN` must be set as a GitHub Actions Secret (Bearer token for Jira REST API).
+ * - `JIRA_DOMAIN` must be set as a GitHub Actions Secret (e.g. `https://yourdomain.atlassian.net`).
+ * - The GitHub Action must have access to the `GITHUB_TOKEN` environment variable to retrieve PR metadata.
+ * - Jira instance must support Bearer token authentication (using PAT).
  *
  * Security:
- * - JIRA_TOKEN is never printed to logs.
- * - SSL cert validation is disabled via `rejectUnauthorized: false`, which is acceptable for internal enterprise Jira servers.
+ * - Jira and GitHub tokens are passed as environment variables.
+ * - SSL certificate validation is disabled (`rejectUnauthorized: false`) for compatibility with internal Jira servers.
  *
  * Author: Ujjval Rajput
  */
@@ -67,6 +77,52 @@ async function postComment(issueKey, commentText) {
     );
   } catch (error) {
     core.setFailed(`Error posting to Jira: ${error.message}`);
+  }
+}
+
+async function getRelatedIssueKeys(issueKey) {
+  const url = `${JIRA_DOMAIN}/rest/api/2/issue/${issueKey}?fields=subtasks,issuelinks`;
+  const relatedKeys = new Set();
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      agent,
+      headers: {
+        Authorization: `Bearer ${JIRA_TOKEN}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(
+        `Failed to fetch related issues for ${issueKey}: ${response.status} ${errorText}`
+      );
+      return [];
+    }
+
+    const data = await response.json();
+
+    // Add subtasks
+    const subtasks = data.fields.subtasks || [];
+    subtasks.forEach((sub) => sub.key && relatedKeys.add(sub.key));
+
+    // Add issue links
+    const links = data.fields.issuelinks || [];
+    links.forEach((link) => {
+      const inward = link.inwardIssue?.key;
+      const outward = link.outwardIssue?.key;
+      if (inward) relatedKeys.add(inward);
+      if (outward) relatedKeys.add(outward);
+    });
+
+    return Array.from(relatedKeys);
+  } catch (error) {
+    console.warn(
+      `Error retrieving related issues for ${issueKey}: ${error.message}`
+    );
+    return [];
   }
 }
 
@@ -181,9 +237,18 @@ async function runWithPR() {
   const commits = await getCommits(pr.number);
   const commentText = buildComment(pr, filesChanged, commits);
 
+  const allKeys = new Set(issueKeys);
+
   for (const issueKey of issueKeys) {
-    console.log(`Posting comment to Jira issue ${issueKey}...`);
-    await postComment(issueKey, commentText);
+    // Get related issues
+    const relatedKeys = await getRelatedIssueKeys(issueKey);
+    relatedKeys.forEach((k) => allKeys.add(k));
+  }
+
+  // Comment on all unique keys
+  for (const key of allKeys) {
+    console.log(`Posting comment to Jira issue ${key}...`);
+    await postComment(key, commentText);
   }
 }
 
