@@ -35822,7 +35822,7 @@ var __webpack_exports__ = {};
  * Behavior:
  * - Triggered via `on: pull_request: types: [closed]`.
  * - Validates that the PR was actually merged (not just closed).
- * - Extracts Jira issue keys from the PR title, branch name, and description using regex (e.g. `ABC-123`).
+ * - Extracts Jira issue keys from the PR title, branch name, description and commit messages using regex (e.g. `ABC-123`).
  * - For each issue key found:
  *   - Retrieves related issues from Jira, including:
  *     - Subtasks
@@ -35851,6 +35851,7 @@ const core = __nccwpck_require__(7484);
 const fetch = __nccwpck_require__(6705);
 const https = __nccwpck_require__(5692);
 const github = __nccwpck_require__(3228);
+const { get } = __nccwpck_require__(8611);
 
 const JIRA_DOMAIN = process.env.JIRA_DOMAIN;
 
@@ -35943,7 +35944,8 @@ function extractIssueKeys(texts) {
     if (!text) continue; // go to next iteration if text is empty
 
     // Regex to match Jira issue keys like DOSE-104, JIRA-123, etc.
-    const regex = /\b[A-Z]{2,10}-\d+\b/g;
+    const regex = /\b[A-Z]{2,10}-\d+\b/g; // word boundary, uppercase letters (2-10), hyphen, digits, word boundary.
+    // g is the global flag. It tells JavaScript to find all matches in the string.
     const matches = text.toUpperCase().match(regex);
 
     if (matches) {
@@ -35959,7 +35961,7 @@ async function getCommits(prNumber) {
 
   if (!octokit) {
     core.setFailed("GITHUB_TOKEN is not set.");
-    return [];
+    return { lines: [], messages: [] };
   }
 
   const { data } = await octokit.rest.pulls.listCommits({
@@ -35968,14 +35970,19 @@ async function getCommits(prNumber) {
     pull_number: prNumber,
   });
 
-  return data.map((commit) => {
+  const lines = [];
+  const messages = [];
+
+  for (const commit of data) {
     const sha = commit.sha ? commit.sha.substring(0, 7) : "(no sha)";
-    const message =
-      commit.commit && commit.commit.message
-        ? commit.commit.message.split("\n")[0]
-        : "(no message)";
-    return `- ${sha}: ${message}`;
-  });
+    const message = commit.commit?.message || "(no message)";
+    const summary = message.split("\n")[0];
+
+    lines.push(`- ${sha}: ${summary}`);
+    messages.push(message);
+  }
+
+  return { lines, messages };
 }
 
 async function getModifiedFiles(prNumber) {
@@ -36035,17 +36042,23 @@ async function runWithPR() {
     return;
   }
 
-  const issueKeys = extractIssueKeys([pr.title, pr.head?.ref, pr.body]); // Check title, branch name, and body for issue key
+  const commits = await getCommits(pr.number);
+  const issueKeys = extractIssueKeys([
+    pr.title, // PR title
+    pr.head?.ref, // PR branch name
+    pr.body, // PR description
+    ...commits.messages, // include commit messages in search
+  ]);
+
   if (issueKeys.length === 0) {
     core.setFailed(
-      "No Jira issue keys found in PR title, branch name, or body."
+      "No Jira issue keys found in PR title, description, branch name, or commit messages."
     );
     return;
   }
 
   const filesChanged = await getModifiedFiles(pr.number);
-  const commits = await getCommits(pr.number);
-  const commentText = buildComment(pr, filesChanged, commits);
+  const commentText = buildComment(pr, filesChanged, commits.lines);
 
   const allKeys = new Set(issueKeys);
 
