@@ -202,6 +202,7 @@ function buildComment(pr, filesChanged = [], commits = []) {
   const commitList =
     commits.length > 0 ? `\n\nCommits:\n` + commits.join("\n") : "";
 
+  // Build the comment text
   return `
 Pull request [#${pr.number}](${prUrl}) was merged by @${author}.
 
