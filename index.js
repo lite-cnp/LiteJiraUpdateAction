@@ -41,7 +41,6 @@ const core = require("@actions/core");
 const fetch = require("node-fetch");
 const https = require("https");
 const github = require("@actions/github");
-const { get } = require("http");
 
 const JIRA_DOMAIN = process.env.JIRA_DOMAIN;
 
@@ -195,6 +194,7 @@ function buildComment(pr, filesChanged = [], commits = []) {
   const author = pr.user?.login || "unknown";
   const title = pr.title || "(no title)";
   const body = pr.body || "(no description)";
+  const prUrl = `https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/pull/${pr.number}`;
   const fileList =
     filesChanged.length > 0
       ? `\n\nFiles Changed:\n- ` + filesChanged.join("\n- ")
@@ -203,7 +203,7 @@ function buildComment(pr, filesChanged = [], commits = []) {
     commits.length > 0 ? `\n\nCommits:\n` + commits.join("\n") : "";
 
   return `
-Pull request merged by @${author}
+Pull request [#${pr.number}](${prUrl}) was merged by @${author}.
 
 PR Title:
 ${title}
