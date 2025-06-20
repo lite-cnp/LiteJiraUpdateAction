@@ -1,11 +1,28 @@
 # Lite Jira Update Action
 
-Automatically posts a comment to a Jira issue when a pull request is merged.
+Automatically posts a detailed comment to one or more Jira issues when a pull request (PR) is merged.
+
+This GitHub Action helps teams maintain traceability between code changes and Jira tickets by automatically commenting on relevant issues — including subtasks and linked issues — with metadata from the pull request.
+
+---
 
 ## Features
 
-- Extracts Jira issue key from PR title or branch (e.g. `PROJ-123`)
-- Posts comment with PR metadata: author, title, description, changed files
+- Extracts **Jira issue keys** from:
+  - PR title
+  - PR description
+  - PR branch name
+  - Commit messages
+- Automatically discovers and includes:
+  - Subtasks of each Jira issue
+  - Inward and outward **linked issues**
+- Posts a comment with:
+  - PR number and link
+  - PR author
+  - PR title and description
+  - List of all files changed in the PR
+  - Commit hashes and messages
+- Deduplicates all discovered issue keys to prevent double-posting
 
 ## Usage
 
