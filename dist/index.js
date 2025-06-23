@@ -35873,6 +35873,11 @@ async function postComment(issueKey, commentText) {
       body: JSON.stringify({ body: commentText }),
     });
 
+    if (response.status === 404) {
+      console.warn(`Skipping unknown issue ${issueKey}: Not found in Jira.`);
+      return;
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       core.setFailed(
