@@ -36016,17 +36016,22 @@ function buildComment(pr, filesChanged = [], commits = []) {
       : "";
   const commitList =
     commits.length > 0 ? `\n\nCommits:\n` + commits.join("\n") : "";
+  const targetBranch = pr.base?.ref || "(unknown)";
 
   // Build the comment text
   return `
-Pull request [#${pr.number}](${prUrl}) was merged by @${author}.
+  Pull request [#${pr.number}](${prUrl}) was merged by @${author}.
 
-PR Title:
-${title}
+  PR Title:
+  ${title}
 
-PR Description:
-${body}${fileList}${commitList}
-`.trim();
+  PR Description:
+  ${body}
+
+  Target Branch:
+  ${targetBranch}${fileList}${commitList}
+  `.trim();
+
 }
 
 async function runWithPR() {
